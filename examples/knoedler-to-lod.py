@@ -4,65 +4,26 @@ import codecs
 import re
 import inspect
 
-# for cidoc_orm, see: https://github.com/azaroth42/Python-CIDOC-ORM
-from cidoc_orm import factory, TimeSpan, ManMadeObject, Type, Identifier, \
+from cromulent import model, vocab
+from cromulent.model import factory, TimeSpan, ManMadeObject, Type, Identifier, \
 	Production, Actor, Person, Place, Group, Material, Mark, \
 	Activity, InformationObject, Purchase, Acquisition, MonetaryAmount, \
 	Currency, MeasurementUnit, Dimension, PhysicalObject
 
-# Meta meta
-ext_classes = {
-	"LocalNumber": {"parent": Identifier, "vocab": "aat", "id": "300404621"},	
-	"AccessionNumber": {"parent": Identifier, "vocab": "aat", "id": "300312355"},	
-	"Inscription": {"parent": Mark, "vocab": "aat", "id": "300028702"},
-	"Signature": {"parent": Mark, "vocab": "aat", "id": "300028705"},
-	"Painting": {"parent": ManMadeObject, "vocab": "aat", "id": "300033618"},
-	"Sculpture": {"parent": ManMadeObject, "vocab": "aat", "id": "300047090"},
-	"Drawing": {"parent": ManMadeObject, "vocab": "aat", "id": "300033973"},
-	"Miniature": {"parent": ManMadeObject, "vocab": "aat", "id": "300033936"},
-	"Tapestry": {"parent": ManMadeObject, "vocab": "aat", "id": "300205002"},
-	"Furniture": {"parent": ManMadeObject, "vocab": "aat", "id": "300037680"},
-	"Mosaic": {"parent": ManMadeObject, "vocab": "aat", "id": "300015342"},
-	"Photograph": {"parent": ManMadeObject, "vocab": "aat", "id": "300046300"},
-	"Drawing": {"parent": ManMadeObject, "vocab": "aat", "id": "300033973"},
-	"Coin": {"parent": ManMadeObject, "vocab": "aat", "id": "300037222"},
-	"Vessel": {"parent": ManMadeObject, "vocab": "aat", "id": "300193015"},
-	"PhotographPrint": {"parent": ManMadeObject, "vocab": "aat", "id": "300127104"},
-	"PhotographAlbum": {"parent": ManMadeObject, "vocab": "aat", "id": "300026695"},
-	"PhotographBook": {"parent": ManMadeObject, "vocab": "aat", "id": "300265728"}
-}
+from cromulent.vocab import Painting, Drawing, Furniture, Sculpture, Tapestry, AccessionNumber
+from cromulent.vocab import dimensionUnits, dimensionTypes
+
+from cromulent.extra import Payment
 
 factory.base_url = "http://data.getty.edu/provenance/"
 factory.context_uri = "http://data.getty.edu/contexts/crm_context.jsonld"
  
-for (name,v) in ext_classes.items():
-	c = type(name, (v['parent'],), {})
-	c._p2_has_type = "http://vocab.getty.edu/%s/%s" % (v['vocab'], v['id'])
-	globals()[name] = c
+endOfMonths = {'01': 31, '02': 28, '03':31, '04':30, '05':31, '06':30,\
+	'07':31, '08':31, '09':30, '10':31, '11':30, '12':31}
 
 # At the moment it's just an activity, no subtype info
 class TakeInventory(Activity): 
 	pass
-
-class Payment(Activity):
-	_properties = {
-		"paid_amount": {"rdf": "pi:paid_amount", "range": MonetaryAmount},
-		"paid_to": {"rdf": "pi:paid_to", "range": Actor},
-		"paid_from": {"rdf": "pi:paid_from", "range": Actor}
-	}
-	_uri_segment = "Payment"
-	_type = "pi:Payment"
-
-Payment._classhier = inspect.getmro(Payment)[:-1]
-
-# Object Types
-# {'Pastel': 265, 'Photograph': 4, 'Clocks': 1, 'Painting [?]': 8, 'Painting': 37313, 
-# '[not identified]': 2, 'Clothing': 1, 'Playing Cards': 1, 'Watercolor': 547, 
-# 'Maps': 1, 'Book': 35, 'Decorative Art': 9, 'Painting; Sculpture': 1, 'Print': 21, 
-# 'Watercolor; Painting': 1, 'Sculpture': 1817, 'Drawing': 225, 'Tapestry': 61, 'Furniture': 22}
-
-endOfMonths = {'01': 31, '02': 28, '03':31, '04':30, '05':31, '06':30,\
-	'07':31, '08':31, '09':30, '10':31, '11':30, '12':31}
 
 aat_type_mapping = {
 	"Painting": Painting,
@@ -73,66 +34,6 @@ aat_type_mapping = {
 	"Watercolor": Painting,
 	"Pastel": Painting
 }
-
-#	  # A wooden support
-aat_part_mapping = {
-	"supports": "300014844"  # The thing that is painted on
-}
-
-aat_material_mapping = {
-	"panel": "300014657",  # Is really a support
-	"watercolor": "300015045",
-	"oil": "300015050",
-	"tempera": "300015062",
-	"canvas": "300014078",
-	"oak": "300012264",
-	"gold leaf": "300264831",
-	"paper": "300014109",
-	"copper": "300011020",
-	"terracotta": "300010669",
-	"glass": "300010797",
-	"chalk": "300011727",
-	"bronze": "300010957",
-	"marble": "300011443",
-	"albumen silver print": "300127121",
-	"gelatin silver print": "300128695",
-	"silver": "300011029"
-}
-
-# pen, pencil, card, cardboard, porcelain, wax, ceramic, plaster
-# crayon, millboard, gouache, brass, stone, lead, iron, clay,
-# alabaster, limestone
-
-
-materialTypes = {}
-for (k,v) in aat_material_mapping.items():
-	m = Material("http://vocab.getty.edu/aat/%s" % v)
-	m.label = k
-	materialTypes[k] = m
-
-aat_culture_mapping = {
-	"french": "300111188",
-	"italian": "300111198",
-	"german": "300111192",
-	"dutch": "300020929"
-}
-
-dim_type_mapping = {
-	"height": "300055644",
-	"width": "300055647",
-	"depth": "300072633",
-	"diameter": "300055624",
-	"weight": "300056240"
-}
-
-dim_unit_mapping = {
-	"inches": "300379100",	
-	"feet": "300379101",
-	"cm": "300379098"
-}
-
-inches = MeasurementUnit("http://vocab.getty.edu/aat/%s" % dim_unit_mapping['inches']);
-inches.label = "inches"
 
 aat_genre_mapping = { 
 	"Abstract" : "300134134", # maybe?
@@ -150,46 +51,8 @@ for (k,v) in aat_genre_mapping.items():
 	t.label = k
 	genreTypes[k] = t
 
-aat_subject_mapping = {
-	"Allegory": "",
-	"Animals": "",
-	"Architecture": "",
-	"Battles": "",
-	"Figure Studies": "",
-	"Interiors": "",
-	"Landscapes with figures": "",
-	"Literature": "",
-	"Marines": "",
-	"Military": "",
-	"Mythology (figures)": "",
-	"Mythology (narrative)": "",
-	"Religious (figures)": "",
-	"Religious (narrative)": "",
-	"Ruins": "",
-	"Sporting": "",
-	"Topographical Views": ""
-}
-
-# Monkey patch Type's _toJSON to only emit full data if not just URI+type
-def typeToJSON(self, top=False):
-	props = self.__dict__.keys()
-	if len(props) > 3:
-		return super(Type, self)._toJSON()
-	else:
-		return self.id
-
-Type._toJSON = typeToJSON
-Person._properties['familyName'] = {"rdf": "schema:familyName", "range": str}
-Person._properties['givenName'] = {"rdf": "schema:givenName", "range": str}
-Person._properties['nationality'] = {"rdf": "schema:nationality", "range": Place}
-ManMadeObject._properties['culture'] = {"rdf": "schema:genre", "range": Type}
-ManMadeObject._properties['height'] = {"rdf": "schema:height", "range": Dimension}
-ManMadeObject._properties['width'] = {"rdf": "schema:width", "range": Dimension}
-
 knoedler = Group("knoedler")
 knoedler.label = "Knoedler"
-
-factory.materialize_inverses = True
 
 def process_money_value(value):
 	value = value.replace('[', '')
@@ -277,14 +140,6 @@ def process_dimensions(dims):
 		dimensions.append([ttl, which])
 	return dimensions
 
-
-def print_rec_full(rec):
-	its = rec.items()
-	its.sort()
-	for (k,v) in its:
-		if v:
-			print "%s: %s" % (k, v)	
-
 stock_books = {}
 pages = {}
 
@@ -293,8 +148,7 @@ cache = json.load(fh)
 fh.close()
 
 recs = cache.values()
-recs = sorted(recs, key=lambda x: x['star_id'])[:5000]
-# recs = [cache['72910']]
+recs = sorted(recs, key=lambda x: x['star_id'])[:10]
 
 for rec in recs:
 
@@ -315,13 +169,13 @@ for rec in recs:
 		page = InformationObject(pageId)
 		page.label = "Page %s" % rec['page_num']
 		pages[pageId] = page
-		book.has_fragment = page
+		book.composed_of = page
 
 	# create the entry
 	entryId = "%s/%s" % (pageId, rec['row_num'])
 	entry = InformationObject(entryId)
 	entry.label = "Row %s" % rec['row_num']
-	page.has_fragment = entry
+	page.composed_of = entry
 
 	# the description and notes fields are related to the entry
 	# not the object
@@ -333,9 +187,6 @@ for rec in recs:
 	oid = rec['pi_id']
 
 	# create the activity that the entry describes
-	# 'Sold':26598,'Unsold':11824,'Exchanged':103,'Presented':246,'Transferred':310
-	# 'Returned':533,'Unknown': 629,   
-	# 'Lost': 7, 'Voided': 16, 'Disjointed': 16, 'Cancelled': 47, 'Removed': 6
 
 	# The outbound activity
 	txn = None
@@ -384,18 +235,18 @@ for rec in recs:
 		value = process_money_value(rec['purchase_amount'])
 		if value:
 			try:
-				amnt.has_value = float(value)
+				amnt.value = float(value)
 			except:
 				amnt.description = value
 		if rec['purchase_currency']:
 			curr = Currency(rec['purchase_currency'])
 			curr.label = rec['purchase_currency']
-			amnt.has_currency = curr
+			amnt.currency = curr
 		if rec['purchase_note']:
 			amnt.description = rec['purchase_note']		
 		pay.paid_amount = amnt
 		pay.paid_from = knoedler
-		inTxn.had_sales_price = amnt
+		inTxn.sales_price = amnt
 
 	else:
 		inTxn = Acquisition("purch_%s" % oid)
@@ -408,14 +259,14 @@ for rec in recs:
 		if rec['seller_loc'] or rec['seller_loc_auth']:
 			sellerPlace = Place("seller_place_%s" % oid)
 			sellerPlace.label = rec['seller_loc_auth'] if rec['seller_loc_auth'] else rec['seller_loc']
-			seller.has_current_or_former_residence = sellerPlace
+			seller.current_or_former_residence = sellerPlace
 		inTxn.transferred_title_from = seller
 		if rec['purchase_amount']:
 			pay.paid_to = seller
 
 	# CurationPeriod
 	curated = Activity("curated_%s" % oid)
-	curated.is_started_by = inTxn
+	curated.started_by = inTxn
 
 	if txn:
 		# from
@@ -428,7 +279,7 @@ for rec in recs:
 			if rec['buyer_loc'] or rec['buyer_loc_auth']:
 				buyerPlace = Place("buyer_place_%s" % oid)
 				buyerPlace.label = rec['buyer_loc_auth'] if rec['buyer_loc_auth'] else rec['buyer_loc']
-				buyer.has_current_or_former_residence = buyerPlace
+				buyer.current_or_former_residence = buyerPlace
 			txn.transferred_title_to = buyer
 
 		# when
@@ -449,22 +300,22 @@ for rec in recs:
 			span = TimeSpan("sale_span_%s" % oid)
 			span.begin_of_the_begin = start
 			span.end_of_the_end = end
-			txn.has_timespan = span
+			txn.timespan = span
 
 		value = process_money_value(rec['price_amount'])
 		if value:
 			amnt = MonetaryAmount("sale_price_%s" % oid)
 			try:
-				amnt.has_value = float(value)
+				amnt.value = float(value)
 			except:
 				amnt.description = value
 			if rec['price_currency']:
 				curr = Currency(rec['price_currency'])
 				curr.label = rec['price_currency']
-				amnt.has_currency = curr
+				amnt.currency = curr
 			if rec['price_note']:
 				amnt.description = rec['price_note']
-			txn.had_sales_price = amnt
+			txn.sales_price = amnt
 
 			# Check knoedler_share
 			if rec['knoedler_share_amount']:
@@ -473,13 +324,13 @@ for rec in recs:
 				if value:
 					amnt = MonetaryAmount("shared_price_%s" % oid)
 					try:
-						amnt.has_value = float(value)
+						amnt.value = float(value)
 					except:
 						amnt.description = value
 					if rec['knoedler_share_currency']:
 						curr = Currency(rec['knoedler_share_currency'])
 						curr.label = rec['knoedler_share_currency']
-						amnt.has_currency = curr
+						amnt.currency = curr
 					if rec['knoedler_share_note']:
 						amnt.description = rec['knoedler_share_note']
 
@@ -498,7 +349,7 @@ for rec in recs:
 				if rec['buyer_name'] or rec['buyer_name_auth']:
 					pay.paid_from = buyer
 
-		curated.is_finished_by = txn
+		curated.finished_by = txn
 	elif inv:
 		# Taking of Inventory as part of the curation period
 		curated.consists_of = inv
@@ -521,7 +372,7 @@ for rec in recs:
 			span = TimeSpan("sale_span_%s" % oid)
 			span.begin_of_the_begin = start
 			span.end_of_the_end = end
-			inv.has_timespan = span
+			inv.timespan = span
 
 
 	if not inv:
@@ -543,7 +394,7 @@ for rec in recs:
 			span = TimeSpan("purch_span_%s" % oid)
 			span.begin_of_the_begin = start
 			span.end_of_the_end = end
-			inTxn.has_timespan = span
+			inTxn.timespan = span
 
 	# create the object of the transaction
 
@@ -578,7 +429,7 @@ for rec in recs:
 
 		prodn = Production("production_%s" % oid)
 		prodn.carried_out_by = artist
-		what.was_produced_by = prodn
+		what.produced_by = prodn
 
 	if rec['artist_name_2'] or rec['artist_name_auth_2']:
 		artist = Person("artist2_%s" % oid)
@@ -588,13 +439,12 @@ for rec in recs:
 			artist.nationality.label = rec['nationality_2']
 		prodn.carried_out_by = artist
 
-
 	# genre
 	if rec['genre'] and not rec['genre'] == '[not identified]':
 		if not aat_genre_mapping.has_key(rec['genre']):
 			print "Not found: %s" % (rec['genre'])
 		else:	
-			what.has_type = genreTypes[rec['genre']]
+			what.classified_as = genreTypes[rec['genre']]
 
 	# subject
 	if rec['subject']:
@@ -623,8 +473,8 @@ for rec in recs:
 		dims = process_dimensions(rec['dimensions'])
 		for d in dims:
 			dim = Dimension("%s_%s" % (d[0], oid))
-			dim.has_value = d[0]
-			dim.has_unit = inches
+			dim.value = d[0]
+			dim.unit = dimensionUnits['inches']
 			if d[1] == 'h':
 				what.height = dim
 			else:
@@ -632,16 +482,7 @@ for rec in recs:
 
 collection = InformationObject("collection")
 for s in stock_books.values():
-	collection.has_fragment = s
+	collection.composed_of = s
 
-
-factory.full_names = True
+factory.full_names = False
 outstr = factory.toString(collection, compact=False)
-
-fh = file('knoedler.jsonld', 'w')
-fh.write(outstr)
-fh.close()
-
-# Note that these entries are really one transaction
-# 64699 ... 64732
-
